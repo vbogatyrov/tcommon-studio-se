@@ -86,6 +86,7 @@ public final class RoutinesUtil {
         }
         return repositoryObjects;
     }
+
     public static List<IRepositoryViewObject> getCurrentSystemRoutines() {
         List<IRepositoryViewObject> repositoryObjects = new ArrayList<IRepositoryViewObject>();
         IProxyRepositoryFactory factory = CoreRuntimePlugin.getInstance().getProxyRepositoryFactory();
