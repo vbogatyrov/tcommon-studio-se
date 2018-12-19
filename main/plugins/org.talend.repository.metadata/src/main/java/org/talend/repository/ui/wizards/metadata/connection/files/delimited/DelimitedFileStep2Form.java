@@ -14,9 +14,11 @@ package org.talend.repository.ui.wizards.metadata.connection.files.delimited;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.emf.common.util.URI;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -51,6 +53,9 @@ import org.talend.core.model.metadata.builder.connection.FieldSeparator;
 import org.talend.core.model.metadata.builder.connection.FileFormat;
 import org.talend.core.model.metadata.builder.connection.RowSeparator;
 import org.talend.core.model.properties.ConnectionItem;
+import org.talend.core.model.properties.impl.RoutineItemImpl;
+import org.talend.core.model.repository.IRepositoryViewObject;
+import org.talend.core.model.routines.RoutinesUtil;
 import org.talend.core.utils.CsvArray;
 import org.talend.core.utils.TalendQuoteUtils;
 import org.talend.designer.core.model.utils.emf.talendfile.ContextType;
@@ -63,7 +68,6 @@ import org.talend.metadata.managment.ui.utils.ShadowProcessHelper;
 import org.talend.metadata.managment.ui.wizard.IRefreshable;
 import org.talend.repository.metadata.i18n.Messages;
 import org.talend.repository.metadata.ui.wizards.form.AbstractDelimitedFileStepForm;
-
 /**
  * @author ocarbone
  * 
@@ -152,6 +156,8 @@ public class DelimitedFileStep2Form extends AbstractDelimitedFileStepForm implem
     private CTabItem outputTabItem;
 
     private Composite outputComposite;
+
+    private static String errorPath = "Code/Routines/";
 
     /**
      * Constructor to use by RCP Wizard.
@@ -1293,6 +1299,7 @@ public class DelimitedFileStep2Form extends AbstractDelimitedFileStepForm implem
 
         @Override
         public void nonUIProcessInThread() {
+            setEmptyFiles();
             // get the XmlArray width an adapt ProcessDescription
             try {
                 if (Escape.CSV.equals(getConnection().getEscapeType())) {
@@ -1371,6 +1378,23 @@ public class DelimitedFileStep2Form extends AbstractDelimitedFileStepForm implem
         public void postProcessCancle() {
             checkFieldsValue();
             previewButton.setEnabled(false);
+        }
+
+        private void setEmptyFiles() {
+            List<IRepositoryViewObject> allRoutines = RoutinesUtil.getErrorRoutines();
+            errorFiles.clear();
+            if (allRoutines.size() > 0) {
+                for (IRepositoryViewObject rv : allRoutines) {
+                    RoutineItemImpl routinesImpl = (RoutineItemImpl) rv.getProperty().getItem();
+                    URI uri = routinesImpl.eResource().getURI();
+                        String[] routinePaht = uri.toString().split("routines/");
+                        if (routinePaht != null && routinePaht.length > 1) {
+                            String f = errorPath + routinePaht[1].substring(0, routinePaht[1].indexOf("properties") - 1);
+                            errorFiles.add(f);
+                        }
+                }
+
+            }
         }
     }
 
@@ -1489,5 +1513,7 @@ public class DelimitedFileStep2Form extends AbstractDelimitedFileStepForm implem
             processor.forceStop();
         }
     }
+
+
 
 }
