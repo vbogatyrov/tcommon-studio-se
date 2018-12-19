@@ -12,6 +12,10 @@
 // ============================================================================
 package org.talend.core.model.routines;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -28,6 +32,7 @@ import org.talend.core.model.general.Project;
 import org.talend.core.model.properties.Item;
 import org.talend.core.model.properties.Property;
 import org.talend.core.model.properties.RoutineItem;
+import org.talend.core.model.properties.impl.RoutineItemImpl;
 import org.talend.core.model.repository.ERepositoryObjectType;
 import org.talend.core.model.repository.IRepositoryViewObject;
 import org.talend.core.prefs.ITalendCorePrefConstants;
@@ -53,6 +58,34 @@ public final class RoutinesUtil {
         return false;
     }
 
+    public static List<IRepositoryViewObject> getErrorRoutines() {
+        List<IRepositoryViewObject> repositoryObjects = new ArrayList<IRepositoryViewObject>();
+        IProxyRepositoryFactory factory = CoreRuntimePlugin.getInstance().getProxyRepositoryFactory();
+        try {
+            List<IRepositoryViewObject> all = factory.getAll(ProjectManager.getInstance().getCurrentProject(),
+                    ERepositoryObjectType.ROUTINES);
+            all.removeAll(getCurrentSystemRoutines());
+            repositoryObjects.addAll(all);
+            for (IRepositoryViewObject fr : all) {
+                RoutineItemImpl rl = (RoutineItemImpl) fr.getProperty().getItem();
+                ByteArrayInputStream tInputStringStream = new ByteArrayInputStream(rl.getContent().getInnerContent());
+                InputStreamReader input = new InputStreamReader(tInputStringStream);
+                BufferedReader br = new BufferedReader(input);
+                String line = null;
+                while ((line = br.readLine()) != null) {
+                        if (line.trim().startsWith("public class " + fr.getProperty().getLabel())) {
+                            repositoryObjects.remove(fr);
+                            continue;
+                        }
+                    }
+            }
+        } catch (PersistenceException e) {
+            ExceptionHandler.process(e);
+        } catch (IOException e) {
+            ExceptionHandler.process(e);
+        }
+        return repositoryObjects;
+    }
     public static List<IRepositoryViewObject> getCurrentSystemRoutines() {
         List<IRepositoryViewObject> repositoryObjects = new ArrayList<IRepositoryViewObject>();
         IProxyRepositoryFactory factory = CoreRuntimePlugin.getInstance().getProxyRepositoryFactory();

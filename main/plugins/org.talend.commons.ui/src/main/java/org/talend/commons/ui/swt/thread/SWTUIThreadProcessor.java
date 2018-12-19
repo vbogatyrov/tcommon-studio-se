@@ -12,6 +12,9 @@
 // ============================================================================
 package org.talend.commons.ui.swt.thread;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -31,6 +34,10 @@ import org.talend.commons.ui.runtime.i18n.Messages;
  * 
  */
 public abstract class SWTUIThreadProcessor {
+
+    public static String compilationErroInfo = "Unresolved compilation problem";
+
+    protected List<String> errorFiles = new ArrayList<String>();
 
     private volatile boolean isStopped = true;
 
@@ -199,6 +206,12 @@ public abstract class SWTUIThreadProcessor {
         }
 
         String errorInfo = exception.getMessage() + "\n"; //$NON-NLS-1$
+        if (errorInfo != null && errorInfo.contains(compilationErroInfo) && errorFiles.size() > 0) {
+            errorInfo = errorInfo + Messages.getString("FileStep2.previewRoutinesErrorNote") + "\n";
+            for (String s : errorFiles) {
+                errorInfo = errorInfo + s + "\n";
+            }
+        }
         errorInfo = errorInfo + Messages.getString("FileStep2.previewFailure") + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
         StackTraceElement[] stackTrace = exception.getStackTrace();
         for (StackTraceElement stackTraceElement : stackTrace) {
