@@ -63,6 +63,7 @@ import org.talend.commons.ui.swt.formtools.Form;
 import org.talend.core.model.metadata.IMetadataColumn;
 import org.talend.core.model.metadata.IMetadataTable;
 import org.talend.core.model.metadata.builder.ConvertionHelper;
+import org.talend.core.model.metadata.builder.connection.ConnectionFactory;
 import org.talend.core.model.metadata.builder.connection.MetadataColumn;
 import org.talend.core.model.metadata.builder.connection.MetadataTable;
 import org.talend.core.model.metadata.builder.connection.XMLFileNode;
@@ -71,6 +72,7 @@ import org.talend.core.model.properties.ConnectionItem;
 import org.talend.core.prefs.ITalendCorePrefConstants;
 import org.talend.core.ui.CoreUIPlugin;
 import org.talend.cwm.helper.ConnectionHelper;
+import org.talend.cwm.helper.PackageHelper;
 import org.talend.datatools.xml.utils.ATreeNode;
 import org.talend.metadata.managment.ui.wizard.metadata.xml.FoxNodeComboViewProvider;
 import org.talend.metadata.managment.ui.wizard.metadata.xml.node.Attribute;
@@ -100,6 +102,9 @@ import org.talend.repository.ui.wizards.metadata.connection.files.xml.view.XmlFi
 import org.talend.repository.ui.wizards.metadata.connection.files.xml.view.XmlFileTableViewerProvider;
 import org.talend.repository.ui.wizards.metadata.connection.files.xml.view.XmlFileTreeViewerProvider;
 import org.talend.repository.ui.wizards.metadata.connection.files.xml.view.XmlTree2SchemaLinker;
+
+import orgomg.cwm.resource.record.RecordFactory;
+import orgomg.cwm.resource.record.RecordFile;
 
 /**
  * wzhang class global comment. Detailled comment
@@ -992,6 +997,11 @@ public class XmlFileOutputStep2Form extends AbstractXmlFileStepForm {
     public void setVisible(boolean visible) {
         super.setVisible(visible);
         if (super.isVisible()) {
+            if (!creation) {
+                List<ATreeNode> rootNodes = ((XmlFileWizard) getPage().getWizard()).getRootNodes();
+                ATreeNode defaultRootNode = getDefaultRootNode(rootNodes);
+                updateConnection(getConnection().getXmlFilePath(), defaultRootNode);
+            }
             initXmlTreeData();
             initSchemaTable();
             boolean useXsd = isUseXsd();
