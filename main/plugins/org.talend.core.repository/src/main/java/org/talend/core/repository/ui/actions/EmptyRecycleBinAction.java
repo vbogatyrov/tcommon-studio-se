@@ -46,6 +46,7 @@ import org.talend.commons.ui.runtime.image.ECoreImage;
 import org.talend.commons.ui.runtime.image.ImageProvider;
 import org.talend.core.GlobalServiceRegister;
 import org.talend.core.ITDQRepositoryService;
+import org.talend.core.model.general.Project;
 import org.talend.core.model.properties.ConnectionItem;
 import org.talend.core.model.properties.Item;
 import org.talend.core.model.repository.ERepositoryObjectType;
@@ -184,16 +185,20 @@ public class EmptyRecycleBinAction extends AContextualAction {
 
             @Override
             public void run(IProgressMonitor monitor) {
+                boolean batchForRemote = !ProjectManager.getInstance().getCurrentProject().isLocal();
+                List<IRepositoryViewObject> batchDeleteObjectList = new ArrayList<IRepositoryViewObject>();
                 IProxyRepositoryFactory factory = ProxyRepositoryFactory.getInstance();
                 for (IRepositoryNode child : children) {
                     try {
-                        deleteElements(factory, (RepositoryNode) child);
+                        deleteElements(factory, (RepositoryNode) child, batchForRemote, batchDeleteObjectList);
                     } catch (Exception e) {
                         MessageBoxExceptionHandler.process(e);
                     }
                 }
                 try {
-                    factory.saveProject(ProjectManager.getInstance().getCurrentProject());
+                    factory.batchDeleteObjectPhysical4Remote(ProjectManager.getInstance().getCurrentProject(),
+                            batchDeleteObjectList);
+                    // factory.saveProject(ProjectManager.getInstance().getCurrentProject());
                 } catch (PersistenceException e) {
                     ExceptionHandler.process(e);
                 }
@@ -256,7 +261,8 @@ public class EmptyRecycleBinAction extends AContextualAction {
         return shell;
     }
 
-    protected void deleteElements(final IProxyRepositoryFactory factory, final RepositoryNode currentNode)
+    protected void deleteElements(final IProxyRepositoryFactory factory, final RepositoryNode currentNode, boolean batchForRemote,
+            List<IRepositoryViewObject> batchDeleteObjectList)
             throws PersistenceException, BusinessException {
         if (!validElement(currentNode)) {
             return;
@@ -290,56 +296,56 @@ public class EmptyRecycleBinAction extends AContextualAction {
                                 page.closeEditor(editors.getEditor(false), false);
                             }
                         }
-                        if (objToDelete.getRepositoryObjectType() != ERepositoryObjectType.JOB_DOC
-                                && objToDelete.getRepositoryObjectType() != ERepositoryObjectType.JOBLET_DOC) {
-                            if (currentNode.getType() == ENodeType.SIMPLE_FOLDER) {
-                                for (IRepositoryNode curNode : currentNode.getChildren()) {
-                                    deleteElements(factory, (RepositoryNode) curNode);
-
-                                }
-                                factory.deleteFolder(ProjectManager.getInstance().getCurrentProject(),
-                                        currentNode.getContentType(),
-                                        RepositoryNodeUtilities.getFolderPath(currentNode.getObject().getProperty().getItem()),
-                                        true);
-                            } else {
-                                // Handle nodes from extension point.
-                                for (IRepositoryContentHandler handler : RepositoryContentManager.getHandlers()) {
-                                    handler.deleteNode(objToDelete);
-                                }
-                                ERepositoryObjectType nodeType = (ERepositoryObjectType) currentNode
-                                        .getProperties(EProperties.CONTENT_TYPE);
-                                if (nodeType == ERepositoryObjectType.ROUTINES || nodeType == ERepositoryObjectType.PIG_UDF) {
-                                    forceBuild = true;
-                                }
-                                if (!forceBuild) {
-                                    if (GlobalServiceRegister.getDefault().isServiceRegistered(ICamelDesignerCoreService.class)) {
-                                        ICamelDesignerCoreService camelService = (ICamelDesignerCoreService) GlobalServiceRegister
-                                                .getDefault().getService(ICamelDesignerCoreService.class);
-                                        if (nodeType == camelService.getBeansType()) {
-                                            forceBuild = true;
-                                        }
-                                    }
-                                }
-                                
-                                if (GlobalServiceRegister.getDefault().isServiceRegistered(ITestContainerProviderService.class)) {
-                                    ITestContainerProviderService testService = (ITestContainerProviderService) GlobalServiceRegister.getDefault()
-                                            .getService(ITestContainerProviderService.class);
-                                    if(testService != null){
-                                    	
-                                    }
-                                    testService.deleteDataFiles(objToDelete);
-                                }
-                                
-                                factory.deleteObjectPhysical(ProjectManager.getInstance().getCurrentProject(), objToDelete, null,
-                                        true);
-                            }
-                        }
-
                     } catch (Exception e) {
                         ExceptionHandler.process(e);
                     }
                 }
             });
+            if (objToDelete.getRepositoryObjectType() != ERepositoryObjectType.JOB_DOC
+                    && objToDelete.getRepositoryObjectType() != ERepositoryObjectType.JOBLET_DOC) {
+                List<IRepositoryViewObject> deleteObjectList = new ArrayList<IRepositoryViewObject>();
+                if (currentNode.getType() == ENodeType.SIMPLE_FOLDER) {
+                    for (IRepositoryNode curNode : currentNode.getChildren()) {
+                        deleteElements(factory, (RepositoryNode) curNode, batchForRemote, deleteObjectList);
+                    }
+                    Project currentProject = ProjectManager.getInstance().getCurrentProject();
+                    factory.batchDeleteObjectPhysical4Remote(currentProject, deleteObjectList);
+                    factory.deleteFolder(ProjectManager.getInstance().getCurrentProject(), currentNode.getContentType(),
+                            RepositoryNodeUtilities.getFolderPath(currentNode.getObject().getProperty().getItem()), true);
+                } else {
+                    // Handle nodes from extension point.
+                    for (IRepositoryContentHandler handler : RepositoryContentManager.getHandlers()) {
+                        handler.deleteNode(objToDelete);
+                    }
+                    ERepositoryObjectType nodeType = (ERepositoryObjectType) currentNode.getProperties(EProperties.CONTENT_TYPE);
+                    if (nodeType == ERepositoryObjectType.ROUTINES || nodeType == ERepositoryObjectType.PIG_UDF) {
+                        forceBuild = true;
+                    }
+                    if (!forceBuild) {
+                        if (GlobalServiceRegister.getDefault().isServiceRegistered(ICamelDesignerCoreService.class)) {
+                            ICamelDesignerCoreService camelService = (ICamelDesignerCoreService) GlobalServiceRegister
+                                    .getDefault().getService(ICamelDesignerCoreService.class);
+                            if (nodeType == camelService.getBeansType()) {
+                                forceBuild = true;
+                            }
+                        }
+                    }
+
+                    if (GlobalServiceRegister.getDefault().isServiceRegistered(ITestContainerProviderService.class)) {
+                        ITestContainerProviderService testService = (ITestContainerProviderService) GlobalServiceRegister
+                                .getDefault().getService(ITestContainerProviderService.class);
+                        if (testService != null) {
+                            testService.deleteDataFiles(objToDelete);
+                        }
+                    }
+                    if (batchForRemote) {
+                        // if remote, batch delete later
+                        batchDeleteObjectList.add(objToDelete);
+                    } else {
+                        factory.deleteObjectPhysical(ProjectManager.getInstance().getCurrentProject(), objToDelete, null, true);
+                    }
+                }
+            }
 
         }
     }
