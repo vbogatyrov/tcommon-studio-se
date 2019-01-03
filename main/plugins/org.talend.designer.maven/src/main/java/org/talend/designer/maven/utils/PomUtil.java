@@ -39,7 +39,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -91,10 +90,15 @@ import org.talend.designer.maven.template.MavenTemplateManager;
 import org.talend.designer.maven.tools.ProcessorDependenciesManager;
 import org.talend.designer.runprocess.IProcessor;
 import org.talend.repository.ProjectManager;
+import org.talend.utils.xml.XmlUtils;
 import org.w3c.dom.Attr;
+import org.w3c.dom.DOMImplementation;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.ls.DOMImplementationLS;
+import org.w3c.dom.ls.LSOutput;
+import org.w3c.dom.ls.LSSerializer;
 import org.xml.sax.SAXException;
 
 /**
@@ -597,8 +601,6 @@ public class PomUtil {
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
         documentBuilderFactory.setNamespaceAware(false);
         DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-        TransformerFactory tfactory = TransformerFactory.newInstance();
-
         Document document = documentBuilder.parse(new ByteArrayInputStream(buf.toByteArray()));
         Element documentElement = document.getDocumentElement();
 
@@ -621,9 +623,9 @@ public class PomUtil {
             attr.setTextContent("http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"); //$NON-NLS-1$
             documentElement.setAttributeNode(attr);
         }
-        Transformer transformer = tfactory.newTransformer();
         DOMSource source = new DOMSource(document);
         StreamResult result = new StreamResult(pomFile);
+        Transformer transformer = XmlUtils.getXmlSecureTransform();
         transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes"); //$NON-NLS-1$
         transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
         transformer.transform(source, result);
@@ -775,8 +777,7 @@ public class PomUtil {
     public static void saveAssemblyFile(IProgressMonitor monitor, IFile assemblyFile, Document document)
             throws TransformerException, IOException {
         final File file = assemblyFile.getLocation().toFile();
-        TransformerFactory transFactory = TransformerFactory.newInstance();
-        Transformer transFormer = transFactory.newTransformer();
+        Transformer transFormer = XmlUtils.getXmlSecureTransform();
         transFormer.setOutputProperty(OutputKeys.INDENT, "yes");
         FileOutputStream output = null;
         try {
@@ -789,6 +790,21 @@ public class PomUtil {
                 } catch (IOException e) {
                     ExceptionHandler.process(e);
                 }
+            }
+        }
+    }
+
+    public static void saveAssemblyFile(IFile assemblyFile, Document document) throws IOException {
+        DOMImplementation implementation = document.getImplementation();
+        if (implementation.hasFeature("LS", "3.0")) { //$NON-NLS-1$ //$NON-NLS-2$
+            DOMImplementationLS implementationLS = (DOMImplementationLS) implementation.getFeature("LS", "3.0"); //$NON-NLS-1$ //$NON-NLS-2$
+            LSSerializer serializer = implementationLS.createLSSerializer();
+            serializer.getDomConfig().setParameter("format-pretty-print", true); //$NON-NLS-1$
+            try (FileWriter writer = new FileWriter(assemblyFile.getLocation().toFile())) {
+                LSOutput output = implementationLS.createLSOutput();
+                output.setEncoding("UTF-8"); //$NON-NLS-1$
+                output.setCharacterStream(writer);
+                serializer.write(document, output);
             }
         }
     }
