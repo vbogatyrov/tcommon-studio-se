@@ -14,6 +14,7 @@ package org.talend.core.nexus;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Dictionary;
 import java.util.Hashtable;
 
